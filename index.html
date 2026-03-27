@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joueurs à suivre — Scouting Tracker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f8f8f6;color:#1a1a1a;padding:1.5rem}
+.wrap{max-width:1400px;margin:0 auto}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px}
+.title{font-size:20px;font-weight:500;color:#1a1a1a}
+.subtitle{font-size:13px;color:#888;margin-top:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:transparent;border:0.5px solid #ccc;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:#1a1a1a;transition:background 0.15s}
+.btn:hover{background:#f0f0ee}
+.btn.primary{background:#dbeafe;border-color:#93c5fd;color:#1e40af;font-weight:500}
+.btn.primary:hover{opacity:0.85}
+.btn.danger{color:#b91c1c;border-color:#fca5a5}
+.btn.danger:hover{background:#fef2f2}
+.btn.success{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:500}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.5rem}
+@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#fff;border-radius:8px;padding:12px 14px;border:0.5px solid #e5e5e3}
+.stat-label{font-size:12px;color:#888;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:500;color:#1a1a1a}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1.25rem}
+.filters input,.filters select{width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:0.5px solid #ddd;background:#fff;color:#1a1a1a}
+.table-wrap{overflow-x:auto;border:0.5px solid #e5e5e3;border-radius:12px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:#f8f8f6;position:sticky;top:0;z-index:1}
+th{padding:10px 10px;text-align:left;font-weight:500;font-size:11px;color:#888;white-space:nowrap;border-bottom:0.5px solid #e5e5e3;cursor:pointer;user-select:none}
+th:hover{color:#1a1a1a}
+td{padding:8px 10px;border-bottom:0.5px solid #e5e5e3;color:#1a1a1a;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
+.badge-gb{background:#f3e8ff;color:#6b21a8}
+.badge-dd,.badge-dc,.badge-dg{background:#dcfce7;color:#166534}
+.badge-mdc,.badge-mc,.badge-moc{background:#fef9c3;color:#854d0e}
+.badge-ad,.badge-ag,.badge-bu{background:#ffedd5;color:#9a3412}
+.stars{color:#f59e0b;font-size:12px;white-space:nowrap}
+.vm-cell{font-variant-numeric:tabular-nums;white-space:nowrap}
+.evol-up{color:#16a34a;font-size:10px}
+.evol-dn{color:#dc2626;font-size:10px}
+.notes-cell{max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#888;font-size:12px}
+.age-warn{color:#b45309;font-size:10px}
+.empty{text-align:center;padding:3rem;color:#bbb}
+.count{font-size:12px;color:#888;margin-bottom:8px}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;z-index:100;padding:2rem 1rem;overflow-y:auto}
+.modal{background:#fff;border:0.5px solid #e5e5e3;border-radius:12px;padding:1.5rem;width:100%;max-width:560px;margin:auto}
+.modal-title{font-size:16px;font-weight:500;margin-bottom:1.25rem;color:#1a1a1a}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid .full{grid-column:1/-1}
+label{display:block;font-size:12px;color:#888;margin-bottom:4px}
+.form-grid input,.form-grid select,.form-grid textarea{width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:0.5px solid #ddd;background:#fff;color:#1a1a1a}
+.form-grid textarea{resize:vertical;min-height:60px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem}
+.age-warn-form{font-size:11px;color:#b45309;margin-top:3px;display:none}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:200;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <div class="title">Joueurs à suivre</div>
+      <div class="subtitle">U23 max — VM max 20M€ — <span id="date-display"></span></div>
+    </div>
+    <div class="actions">
+      <button class="btn success" onclick="loadPreloaded()" id="btn-preload">⬇ Charger ma liste (245 joueurs)</button>
+      <button class="btn primary" onclick="openModal()">+ Ajouter un joueur</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total joueurs</div><div class="stat-val" id="s-total">0</div></div>
+    <div class="stat"><div class="stat-label">VM moy. actuelle</div><div class="stat-val" id="s-vm">—</div></div>
+    <div class="stat"><div class="stat-label">Âge moyen</div><div class="stat-val" id="s-age">—</div></div>
+    <div class="stat"><div class="stat-label">Postes différents</div><div class="stat-val" id="s-postes">—</div></div>
+    <div class="stat"><div class="stat-label">Plus-value totale</div><div class="stat-val" id="s-plusvalue">—</div></div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="f-search" placeholder="🔍 Rechercher..." oninput="render()">
+    <select id="f-poste" onchange="render()">
+      <option value="">Tous les postes</option>
+      <option>GB</option><option>DD</option><option>DC</option><option>DG</option>
+      <option>MDC</option><option>MC</option><option>MOC</option>
+      <option>AD</option><option>AG</option><option>BU</option>
+    </select>
+    <select id="f-stars" onchange="render()">
+      <option value="">Toutes notes</option>
+      <option value="5">5★</option><option value="4.5">4.5★</option><option value="4">4★+</option>
+      <option value="3">3★+</option><option value="0">À voir</option>
+    </select>
+    <input type="number" id="f-age-max" placeholder="Âge max" min="13" max="25" oninput="render()">
+    <input type="number" id="f-vm-max" placeholder="VM max (M€)" step="0.5" oninput="render()">
+    <select id="f-sort" onchange="render()">
+      <option value="stars_desc">Note ↓</option>
+      <option value="date_desc">Date ↓</option>
+      <option value="date_asc">Date ↑</option>
+      <option value="age_asc">Âge ↑</option>
+      <option value="age_desc">Âge ↓</option>
+      <option value="vm_desc">VM ↓</option>
+      <option value="vm_asc">VM ↑</option>
+      <option value="evol_desc">Plus-value ↓</option>
+      <option value="nom_asc">Nom A→Z</option>
+    </select>
+  </div>
+
+  <div class="count" id="count-line"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nom</th>
+          <th>Poste</th>
+          <th>Âge</th>
+          <th>Note</th>
+          <th>Club</th>
+          <th>Nationalité</th>
+          <th>VM ajout</th>
+          <th>VM actuelle</th>
+          <th>Évolution</th>
+          <th>Style</th>
+          <th>Notes</th>
+          <th>Date ajout</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty-state" class="empty" style="display:none">Aucun joueur trouvé</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal" style="display:none" onclick="bgClick(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nouveau joueur</div>
+    <div class="form-grid">
+      <div class="full">
+        <label>Nom complet *</label>
+        <input type="text" id="f-nom" placeholder="ex: Kylian Mbappé">
+      </div>
+      <div>
+        <label>Poste *</label>
+        <select id="f-fposte">
+          <option value="">— choisir —</option>
+          <option>GB</option><option>DD</option><option>DC</option><option>DG</option>
+          <option>MDC</option><option>MC</option><option>MOC</option>
+          <option>AD</option><option>AG</option><option>BU</option>
+        </select>
+      </div>
+      <div>
+        <label>Âge</label>
+        <input type="number" id="f-fage" min="13" max="40" placeholder="ex: 19" oninput="checkAge()">
+        <div class="age-warn-form" id="age-warn">⚠ Plus de 23 ans (hors critère U23)</div>
+      </div>
+      <div>
+        <label>Note (★)</label>
+        <select id="f-fstars">
+          <option value="">À voir</option>
+          <option value="1">1★</option><option value="1.5">1.5★</option>
+          <option value="2">2★</option><option value="2.5">2.5★</option>
+          <option value="3">3★</option><option value="3.5">3.5★</option>
+          <option value="4">4★</option><option value="4.5">4.5★</option>
+          <option value="5">5★</option>
+        </select>
+      </div>
+      <div>
+        <label>Nationalité</label>
+        <input type="text" id="f-fnat" placeholder="ex: Français">
+      </div>
+      <div>
+        <label>Club actuel</label>
+        <input type="text" id="f-fclub" placeholder="ex: RC Lens">
+      </div>
+      <div>
+        <label>VM à l'ajout (M€)</label>
+        <input type="number" id="f-fvmadd" step="0.1" min="0" placeholder="ex: 5">
+      </div>
+      <div>
+        <label>VM actuelle (M€)</label>
+        <input type="number" id="f-fvm" step="0.1" min="0" placeholder="ex: 5">
+      </div>
+      <div class="full">
+        <label>Date d'ajout</label>
+        <input type="date" id="f-fdate">
+      </div>
+      <div class="full">
+        <label>Style de joueur</label>
+        <input type="text" id="f-fstyle" placeholder="ex: Ailier technique, bon dribbleur">
+      </div>
+      <div class="full">
+        <label>Notes / commentaires</label>
+        <textarea id="f-fnotes" placeholder="Observations, matchs vus, points à surveiller..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Annuler</button>
+      <button class="btn primary" onclick="savePlayer()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PRELOADED = [{"id":"69rvvngc","nom":"George Ilenikhena","poste":"BU","age":"18","nat":"","club":"","vm_add":"7","vm":"12","date":"","style":"4★","notes":""},{"id":"tqah1bni","nom":"Pio Esposito","poste":"BU","age":"19","nat":"","club":"","vm_add":"3","vm":"45","date":"","style":"3★","notes":""},{"id":"fp0iwwoz","nom":"Chido Obi-Martin","poste":"BU","age":"17","nat":"","club":"","vm_add":"0.4","vm":"5","date":"","style":"5★","notes":""},{"id":"e7s9cz3v","nom":"Orri Óskarsson","poste":"BU","age":"20","nat":"","club":"","vm_add":"5","vm":"12","date":"","style":"3★","notes":""},{"id":"4d9xt365","nom":"Semih Kılıçsoy","poste":"BU","age":"19","nat":"","club":"","vm_add":"12","vm":"13","date":"","style":"3.5★","notes":""},{"id":"yyrtghj6","nom":"Francesco Camarda","poste":"BU","age":"16","nat":"","club":"","vm_add":"10","vm":"15","date":"","style":"5★","notes":""},{"id":"qiajyze5","nom":"Eli Junior Kroupi","poste":"BU","age":"18","nat":"","club":"","vm_add":"10","vm":"40","date":"","style":"4★","notes":""},{"id":"p5t67sms","nom":"Gabriel Silva","poste":"BU","age":"17","nat":"","club":"","vm_add":"0","vm":"0.25","date":"","style":"2.5★","notes":""},{"id":"f5vo7994","nom":"Franjo Ivanovic","poste":"BU","age":"21","nat":"","club":"","vm_add":"4","vm":"20","date":"","style":"2★","notes":""},{"id":"6t4suuai","nom":"Santiago Castro","poste":"BU","age":"19","nat":"","club":"","vm_add":"7","vm":"35","date":"","style":"4★","notes":""},{"id":"tfsrqrf6","nom":"Conrad Harder","poste":"BU","age":"19","nat":"","club":"","vm_add":"18","vm":"20","date":"","style":"3.5★","notes":""},{"id":"unfb4sf9","nom":"Stefanos Tzimas","poste":"BU","age":"18","nat":"","club":"","vm_add":"10","vm":"20","date":"","style":"4.5★","notes":""},{"id":"3zzt4ohu","nom":"Kauã Elias","poste":"BU","age":"18","nat":"","club":"","vm_add":"9","vm":"15","date":"","style":"3.5★","notes":""},{"id":"bkw7r404","nom":"Shumaira Mheuka","poste":"BU","age":"17","nat":"","club":"","vm_add":"0","vm":"3","date":"","style":"2★","notes":""},{"id":"fjcr3u7b","nom":"Nelson Weiper","poste":"BU","age":"19","nat":"","club":"","vm_add":"4","vm":"10","date":"","style":"3.5★","notes":""},{"id":"ba1f3err","nom":"Mihajlo Cvetkovic","poste":"BU","age":"17","nat":"","club":"","vm_add":"5","vm":"6","date":"","style":"3.5★","notes":""},{"id":"od631sj9","nom":"Charalampos Kostoulas","poste":"BU","age":"17","nat":"","club":"","vm_add":"3","vm":"25","date":"","style":"2.5★","notes":""},{"id":"1f0dkhcp","nom":"Enzo Molebe","poste":"BU","age":"17","nat":"","club":"","vm_add":"0.1","vm":"0.3","date":"","style":"1.5★","notes":""},{"id":"0vxdg7vm","nom":"Jerónimo Dómina","poste":"BU","age":"19","nat":"","club":"","vm_add":"3.2","vm":"2","date":"","style":"","notes":""},{"id":"f8cg5pb1","nom":"Reigan Heskey","poste":"BU","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"","notes":""},{"id":"8wsjxi34","nom":"Agustín Ruberto","poste":"BU","age":"19","nat":"","club":"","vm_add":"3","vm":"2","date":"","style":"3★","notes":""},{"id":"2pwb5oxs","nom":"Julian Hall","poste":"BU","age":"16","nat":"","club":"","vm_add":"0.5","vm":"1","date":"","style":"","notes":""},{"id":"srslkfww","nom":"Mustafa Hekimoğlu","poste":"BU","age":"17","nat":"","club":"","vm_add":"2.5","vm":"5","date":"","style":"","notes":""},{"id":"pikzwwwj","nom":"Gassimou Sylla","poste":"BU","age":"16","nat":"","club":"","vm_add":"0.4","vm":"0.25","date":"","style":"","notes":""},{"id":"1fpktadf","nom":"Ozan Demirbağ","poste":"BU","age":"16","nat":"","club":"","vm_add":"0.1","vm":"0.175","date":"","style":"","notes":""},{"id":"htf94ro3","nom":"Anhá Cande","poste":"BU","age":"17","nat":"","club":"","vm_add":"2.2","vm":"1.5","date":"","style":"","notes":""},{"id":"fze3zcbh","nom":"James Wilson","poste":"BU","age":"17","nat":"","club":"","vm_add":"0.8","vm":"1.2","date":"","style":"","notes":""},{"id":"xt9ty072","nom":"Max Moerstedt","poste":"BU","age":"18","nat":"","club":"","vm_add":"4","vm":"7","date":"","style":"","notes":""},{"id":"sl78nh36","nom":"Milos Lukovic","poste":"BU","age":"19","nat":"","club":"","vm_add":"5","vm":"5","date":"","style":"2★","notes":""},{"id":"4mk2azsr","nom":"Djylian N'Guessan","poste":"BU","age":"16","nat":"","club":"","vm_add":"0.8","vm":"5","date":"2025-03-01","style":"3.5★","notes":""},{"id":"es7x6osu","nom":"Dastan Satpaev","poste":"BU","age":"16","nat":"","club":"","vm_add":"1.8","vm":"3","date":"2025-07-29","style":"3.5★","notes":""},{"id":"uq6uk2b0","nom":"Artem Stepanov","poste":"BU","age":"17","nat":"","club":"","vm_add":"1.8","vm":"1.5","date":"2025-08-02","style":"","notes":""},{"id":"fun2xczs","nom":"Alejandro Gomes Rodríguez","poste":"BU","age":"17","nat":"","club":"","vm_add":"0.1","vm":"0.5","date":"","style":"3★","notes":""},{"id":"qepdnzry","nom":"Christ Batola","poste":"BU","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"","notes":""},{"id":"hislg1c5","nom":"Hamza Igamane","poste":"BU","age":"22","nat":"","club":"","vm_add":"7","vm":"18","date":"2025-09-13","style":"3.5★","notes":""},{"id":"jni56ul6","nom":"Bogdan Popov","poste":"BU","age":"18","nat":"","club":"","vm_add":"3","vm":"3","date":"2025-10-30","style":"","notes":""},{"id":"70fkxpex","nom":"Kader Meïté","poste":"BU","age":"18","nat":"","club":"","vm_add":"8","vm":"10","date":"2025-11-02","style":"4★","notes":""},{"id":"1u396acv","nom":"Alexander Staff","poste":"BU","age":"17","nat":"","club":"","vm_add":"0.35","vm":"0.35","date":"2025-11-02","style":"4★","notes":""},{"id":"4yqe353r","nom":"Andrej Kostic","poste":"BU","age":"18","nat":"","club":"","vm_add":"2.5","vm":"5","date":"2025-11-04","style":"1.5★","notes":""},{"id":"m550p3ii","nom":"Mikkel Bro Hansen","poste":"BU","age":"16","nat":"","club":"","vm_add":"0.8","vm":"0.8","date":"2025-11-06","style":"","notes":""},{"id":"x9cvd5lm","nom":"Robinio Vaz","poste":"BU","age":"18","nat":"","club":"","vm_add":"4","vm":"18","date":"2025-11-06","style":"3.5★","notes":""},{"id":"yeqb6vt1","nom":"Anísio Cabral","poste":"BU","age":"17","nat":"","club":"","vm_add":"0","vm":"5","date":"2026-01-06","style":"5★","notes":""},{"id":"6jecuwq7","nom":"Bynoe-Gittens","poste":"AG","age":"20","nat":"","club":"","vm_add":"18","vm":"35","date":"","style":"5★","notes":""},{"id":"l7gjbife","nom":"Mikey Moore","poste":"AG","age":"17","nat":"","club":"","vm_add":"1","vm":"16","date":"","style":"5★","notes":""},{"id":"ttuv4fn9","nom":"Julien Duranville","poste":"AG","age":"18","nat":"","club":"","vm_add":"8.5","vm":"7.5","date":"","style":"4★","notes":""},{"id":"0ns24f2d","nom":"Leo Sauer","poste":"AG","age":"19","nat":"","club":"","vm_add":"5","vm":"7","date":"","style":"","notes":""},{"id":"97n0k49v","nom":"Bazoumana Touré","poste":"AG","age":"18","nat":"","club":"","vm_add":"9","vm":"35","date":"","style":"","notes":""},{"id":"iyjiprrr","nom":"Martín Mundaca","poste":"AG","age":"17","nat":"","club":"","vm_add":"0.65","vm":"0.65","date":"","style":"","notes":""},{"id":"wdqbng1y","nom":"Gabriel Mec","poste":"AG","age":"16","nat":"","club":"","vm_add":"0","vm":"12","date":"","style":"","notes":""},{"id":"mryxdr2l","nom":"William Gomes","poste":"AG","age":"18","nat":"","club":"","vm_add":"6","vm":"20","date":"","style":"","notes":""},{"id":"nekrih0z","nom":"Santiago López","poste":"AG","age":"18","nat":"","club":"","vm_add":"2","vm":"2","date":"","style":"","notes":""},{"id":"2gstcius","nom":"Mika Godts","poste":"AG","age":"18","nat":"","club":"","vm_add":"10","vm":"25","date":"","style":"","notes":""},{"id":"c0ttgllt","nom":"Kerim Alajbegovic","poste":"AG","age":"17","nat":"","club":"","vm_add":"0","vm":"15","date":"","style":"3.5★","notes":""},{"id":"zrwu37j8","nom":"Óscar Perea","poste":"AG","age":"19","nat":"","club":"","vm_add":"2.5","vm":"2","date":"2025-01-27","style":"3★","notes":""},{"id":"m4fxagdm","nom":"Andreas Schjelderup","poste":"AG","age":"20","nat":"","club":"","vm_add":"10","vm":"20","date":"2025-02-12","style":"4★","notes":""},{"id":"6gtvtfvt","nom":"Clement Bischoff","poste":"AG","age":"19","nat":"","club":"","vm_add":"3.5","vm":"5","date":"","style":"","notes":""},{"id":"qfsvf04r","nom":"Oskar Spiten-Nysæter","poste":"AG","age":"17","nat":"","club":"","vm_add":"2.7","vm":"4.5","date":"","style":"2.5★","notes":""},{"id":"alehhhtz","nom":"Rio Ngumoha","poste":"AG","age":"16","nat":"","club":"","vm_add":"0","vm":"15","date":"","style":"5★","notes":""},{"id":"s7i9mb9b","nom":"JJ Gabriel","poste":"AG","age":"14","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"5★","notes":"Peut-être le meilleur joueur de l'histoire"},{"id":"v7cjp9fn","nom":"Ruben van Bommel","poste":"AG","age":"21","nat":"","club":"","vm_add":"8","vm":"12","date":"","style":"4★","notes":"Se régalerait en PL"},{"id":"n7ib2omc","nom":"Oskar Pietuszewski","poste":"AG","age":"17","nat":"","club":"","vm_add":"2.5","vm":"20","date":"","style":"5★","notes":""},{"id":"ldimnog3","nom":"Jeremy Monga","poste":"AG","age":"16","nat":"","club":"","vm_add":"8","vm":"10","date":"2025-10-13","style":"4.5★","notes":""},{"id":"3yba9sbg","nom":"Mathys Detourbet","poste":"AG","age":"18","nat":"","club":"","vm_add":"4","vm":"10","date":"2026-01-24","style":"","notes":""},{"id":"rmlbcio3","nom":"Luis Fragozo","poste":"AG","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-03-23","style":"","notes":""},{"id":"tm9tpw9a","nom":"Mathis Albert","poste":"AG","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-02-01","style":"","notes":""},{"id":"lfwr8hjx","nom":"Estevao","poste":"AD","age":"17","nat":"","club":"","vm_add":"10","vm":"80","date":"","style":"5★","notes":""},{"id":"4hhhkad5","nom":"Ibrahim Mbaye","poste":"AD","age":"16","nat":"","club":"","vm_add":"0","vm":"30","date":"","style":"3.5★","notes":""},{"id":"8nz5te0x","nom":"Roony Bardghji","poste":"AD","age":"18","nat":"","club":"","vm_add":"9","vm":"15","date":"","style":"4★","notes":""},{"id":"u3kyxhc3","nom":"Adam Daghim","poste":"AD","age":"19","nat":"","club":"","vm_add":"2","vm":"7.5","date":"","style":"3★","notes":""},{"id":"0u4ybnmk","nom":"Geovany Quenda","poste":"AD","age":"17","nat":"","club":"","vm_add":"15","vm":"42","date":"","style":"5★","notes":""},{"id":"3l066khm","nom":"Edwin Quintero","poste":"AD","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"4★","notes":""},{"id":"casjv28a","nom":"Min-hyeok Yang","poste":"AD","age":"18","nat":"","club":"","vm_add":"3.5","vm":"3","date":"","style":"4★","notes":""},{"id":"0y17whhw","nom":"Sindre Walle Egeli","poste":"AD","age":"18","nat":"","club":"","vm_add":"7","vm":"18","date":"","style":"3★","notes":""},{"id":"scea51qs","nom":"Rayan","poste":"AD","age":"18","nat":"","club":"","vm_add":"10","vm":"40","date":"","style":"1.5★","notes":""},{"id":"h4qvyncb","nom":"Keny Arroyo","poste":"AD","age":"18","nat":"","club":"","vm_add":"4","vm":"9","date":"","style":"3.5★","notes":""},{"id":"iktdfipe","nom":"Jones El-Abdellaoui","poste":"AD","age":"19","nat":"","club":"","vm_add":"2.3","vm":"8","date":"","style":"2.5★","notes":""},{"id":"ske3c3um","nom":"Bruno Durdov","poste":"AD","age":"17","nat":"","club":"","vm_add":"3.5","vm":"3","date":"","style":"","notes":""},{"id":"wlhxd4id","nom":"Oskar Sivertsen","poste":"AD","age":"20","nat":"","club":"","vm_add":"1.5","vm":"0.7","date":"","style":"","notes":""},{"id":"pwti04a7","nom":"Marius Broholm","poste":"AD","age":"20","nat":"","club":"","vm_add":"4.5","vm":"6","date":"","style":"","notes":""},{"id":"a7lo3get","nom":"Chemsdine Talbi","poste":"AD","age":"19","nat":"","club":"","vm_add":"3","vm":"25","date":"","style":"3★","notes":""},{"id":"tepl2n00","nom":"Andrija Maksimovic","poste":"AD","age":"17","nat":"","club":"","vm_add":"10","vm":"12","date":"","style":"4★","notes":""},{"id":"cm5jym6p","nom":"Ilies Belmokhtar","poste":"AD","age":"17","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"","notes":""},{"id":"vy4q3sj3","nom":"Gabriel Rajković","poste":"AD","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-03-23","style":"","notes":""},{"id":"emgf999x","nom":"Ebrima Tunkara","poste":"AD","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-03-23","style":"","notes":""},{"id":"01lf4z5u","nom":"Joshua Abe","poste":"AD","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-03-23","style":"","notes":""},{"id":"hdy1ncex","nom":"Kendry Paez","poste":"MOC","age":"17","nat":"","club":"","vm_add":"10","vm":"10","date":"","style":"5★","notes":""},{"id":"jxbo8ljf","nom":"Désiré Doué","poste":"MOC","age":"19","nat":"","club":"","vm_add":"15","vm":"90","date":"","style":"5★","notes":""},{"id":"i52c9l41","nom":"Ethan Nwaneri","poste":"MOC","age":"17","nat":"","club":"","vm_add":"8","vm":"40","date":"","style":"5★","notes":""},{"id":"eobjyke9","nom":"Konstantinos Karetsas","poste":"MOC","age":"17","nat":"","club":"","vm_add":"4","vm":"35","date":"","style":"4.5★","notes":""},{"id":"4fxp3nas","nom":"Rodrigo Mora","poste":"MOC","age":"17","nat":"","club":"","vm_add":"3","vm":"38","date":"","style":"5★","notes":""},{"id":"owe8x79h","nom":"Claudio Echeverri","poste":"MOC","age":"19","nat":"","club":"","vm_add":"18","vm":"15","date":"","style":"5★","notes":""},{"id":"hkug69p0","nom":"Franco Mastantuono","poste":"MOC","age":"17","nat":"","club":"","vm_add":"10","vm":"45","date":"","style":"5★","notes":""},{"id":"uskyyykk","nom":"Noah Darvich","poste":"MOC","age":"17","nat":"","club":"","vm_add":"2.5","vm":"3","date":"","style":"3★","notes":""},{"id":"wycmcbt5","nom":"Simone Pafundi","poste":"MOC","age":"18","nat":"","club":"","vm_add":"8","vm":"5","date":"","style":"","notes":""},{"id":"kmlrisvo","nom":"Aleksey Batrakov","poste":"MOC","age":"19","nat":"","club":"","vm_add":"8","vm":"25","date":"","style":"3★","notes":""},{"id":"zhyhzt4i","nom":"Can Uzun","poste":"MOC","age":"19","nat":"","club":"","vm_add":"12","vm":"45","date":"","style":"","notes":""},{"id":"0b2gwbib","nom":"Gilberto Mora","poste":"MOC","age":"16","nat":"","club":"","vm_add":"2","vm":"10","date":"","style":"4★","notes":""},{"id":"jsd1b9ki","nom":"Matías Acevedo","poste":"MOC","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"3★","notes":""},{"id":"e8vjd0vx","nom":"Sebastian Olderheim","poste":"MOC","age":"17","nat":"","club":"","vm_add":"2.5","vm":"2.5","date":"","style":"","notes":""},{"id":"ktqmxudh","nom":"Lorran","poste":"MOC","age":"18","nat":"","club":"","vm_add":"12","vm":"7.5","date":"","style":"","notes":""},{"id":"52qy2osm","nom":"Mario Stroeykens","poste":"MOC","age":"20","nat":"","club":"","vm_add":"14","vm":"6","date":"","style":"","notes":""},{"id":"2crbvvwz","nom":"Lucá Williams-Barnett","poste":"MOC","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"4.5★","notes":""},{"id":"flsg82gg","nom":"Max Dowman","poste":"MOC","age":"15","nat":"","club":"","vm_add":"0","vm":"20","date":"","style":"5★","notes":""},{"id":"ro75kg5q","nom":"Divine Mukasa","poste":"MOC","age":"17","nat":"","club":"","vm_add":"0","vm":"5","date":"","style":"","notes":""},{"id":"0rd9fpbr","nom":"Harry Howell","poste":"MOC","age":"16","nat":"","club":"","vm_add":"0","vm":"0.3","date":"","style":"","notes":""},{"id":"3o5i10g2","nom":"Mattia Liberali","poste":"MOC","age":"17","nat":"","club":"","vm_add":"5","vm":"7","date":"","style":"","notes":""},{"id":"x7tm0dd7","nom":"Tiago Rodrigues","poste":"MOC","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"","notes":""},{"id":"rka0ne4h","nom":"Ibrahim Rabbaj","poste":"MOC","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"","notes":""},{"id":"b86gnp42","nom":"Sem Steijn","poste":"MOC","age":"23","nat":"","club":"","vm_add":"10","vm":"11","date":"","style":"2.5★","notes":""},{"id":"7vakc2v9","nom":"Vasilije Adžić","poste":"MOC","age":"19","nat":"","club":"","vm_add":"4","vm":"8","date":"","style":"","notes":""},{"id":"85kjiy6y","nom":"Álvaro Montoro","poste":"MOC","age":"18","nat":"","club":"","vm_add":"8","vm":"10","date":"","style":"","notes":""},{"id":"cr8m3ogl","nom":"Francis Onyeka","poste":"MOC","age":"18","nat":"","club":"","vm_add":"6","vm":"10","date":"","style":"4★","notes":""},{"id":"4ihch0dj","nom":"Ensar Music","poste":"MOC","age":"18","nat":"","club":"","vm_add":"0.25","vm":"0.25","date":"2026-01-24","style":"","notes":""},{"id":"hezt3t78","nom":"David Moreno","poste":"MOC","age":"14","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-02-11","style":"5★","notes":""},{"id":"q5kd1x9p","nom":"Kobbie Mainoo","poste":"MC","age":"18","nat":"","club":"","vm_add":"6","vm":"50","date":"","style":"5★","notes":""},{"id":"5k4sig4i","nom":"Lucas Bergvall","poste":"MC","age":"18","nat":"","club":"","vm_add":"10","vm":"40","date":"","style":"5★","notes":""},{"id":"q6sgbrif","nom":"Sverre Nypan","poste":"MC","age":"18","nat":"","club":"","vm_add":"9","vm":"15","date":"","style":"5★","notes":""},{"id":"54buq380","nom":"Ayman Kari","poste":"MC","age":"19","nat":"","club":"","vm_add":"0.9","vm":"1","date":"","style":"1★","notes":""},{"id":"09hs2gul","nom":"Kees Smit","poste":"MC","age":"19","nat":"","club":"","vm_add":"5","vm":"25","date":"","style":"5★","notes":""},{"id":"vchdrydv","nom":"Justin Lerma","poste":"MC","age":"16","nat":"","club":"","vm_add":"3","vm":"3","date":"","style":"3.5★","notes":""},{"id":"evb3ra63","nom":"Noah Sadiki","poste":"MC","age":"20","nat":"","club":"","vm_add":"8","vm":"25","date":"","style":"2.5★","notes":""},{"id":"p4s85ycy","nom":"Ngal'ayel Mukau","poste":"MC","age":"20","nat":"","club":"","vm_add":"10","vm":"12","date":"2025-03-12","style":"3★","notes":""},{"id":"oe3j5gyc","nom":"Chris Rigg","poste":"MC","age":"17","nat":"","club":"","vm_add":"12","vm":"25","date":"","style":"4★","notes":""},{"id":"xpgernmt","nom":"Christos Mouzakitis","poste":"MC","age":"18","nat":"","club":"","vm_add":"3","vm":"25","date":"","style":"","notes":""},{"id":"51661t1j","nom":"Matias Siltanen","poste":"MC","age":"17","nat":"","club":"","vm_add":"0.8","vm":"1","date":"","style":"2.5★","notes":""},{"id":"72l5iio4","nom":"Ezechiel Banzuzi","poste":"MC","age":"19","nat":"","club":"","vm_add":"5","vm":"18","date":"","style":"","notes":""},{"id":"0r9v5h6r","nom":"Federico Coletta","poste":"MC","age":"17","nat":"","club":"","vm_add":"0","vm":"1","date":"","style":"3★","notes":""},{"id":"1nuge6oy","nom":"João Simões","poste":"MC","age":"18","nat":"","club":"","vm_add":"2.5","vm":"15","date":"","style":"","notes":""},{"id":"pxj16xmu","nom":"Guille Fernández","poste":"MC","age":"16","nat":"","club":"","vm_add":"0.5","vm":"3","date":"","style":"","notes":""},{"id":"t7kz4t38","nom":"Valentin Atangana","poste":"MC","age":"19","nat":"","club":"","vm_add":"9","vm":"15","date":"","style":"","notes":""},{"id":"jnxy4hqy","nom":"Christian Ordóñez","poste":"MC","age":"20","nat":"","club":"","vm_add":"7","vm":"6.5","date":"","style":"2.5★","notes":""},{"id":"9jjj5iuu","nom":"Jobe Bellingham","poste":"MC","age":"19","nat":"","club":"","vm_add":"18","vm":"25","date":"","style":"5★","notes":""},{"id":"h51m99em","nom":"Andrija Bulatovic","poste":"MC","age":"17","nat":"","club":"","vm_add":"0.4","vm":"5","date":"","style":"2★","notes":"Mis après rumeur Lens"},{"id":"vaxdxovo","nom":"Abdellah Ouazane","poste":"MC","age":"16","nat":"","club":"","vm_add":"0","vm":"1","date":"2025-01-27","style":"","notes":""},{"id":"2izzcy2m","nom":"Dominik Pech","poste":"MC","age":"18","nat":"","club":"","vm_add":"0.8","vm":"2","date":"","style":"2.5★","notes":""},{"id":"setw1gkz","nom":"Trey Nyoni","poste":"MC","age":"18","nat":"","club":"","vm_add":"4.5","vm":"6","date":"","style":"4★","notes":""},{"id":"qoch0u27","nom":"Khalis Merah","poste":"MC","age":"18","nat":"","club":"","vm_add":"0","vm":"10","date":"","style":"4★","notes":""},{"id":"6bekjybv","nom":"Louis Leroux","poste":"MC","age":"19","nat":"","club":"","vm_add":"4","vm":"12","date":"","style":"","notes":""},{"id":"m2el4f3o","nom":"Caleb Yirenkyi","poste":"MC","age":"19","nat":"","club":"","vm_add":"1","vm":"1","date":"","style":"","notes":""},{"id":"df0paa51","nom":"Alex Tóth","poste":"MC","age":"19","nat":"","club":"","vm_add":"2.5","vm":"8","date":"","style":"","notes":""},{"id":"weyuz2vw","nom":"Victor Froholdt","poste":"MC","age":"19","nat":"","club":"","vm_add":"12","vm":"30","date":"","style":"","notes":""},{"id":"4u4sai1j","nom":"Believe Munongo","poste":"MC","age":"15","nat":"","club":"","vm_add":"0","vm":"10","date":"","style":"","notes":""},{"id":"4vvpoxg6","nom":"Rudy Matondo","poste":"MC","age":"17","nat":"","club":"","vm_add":"1.5","vm":"15","date":"2025-11-02","style":"","notes":""},{"id":"zwvl9vgo","nom":"Vasilije Kostov","poste":"MC","age":"17","nat":"","club":"","vm_add":"3.5","vm":"18","date":"2025-11-06","style":"","notes":""},{"id":"xnfks3el","nom":"Reggie Walsh","poste":"MC","age":"17","nat":"","club":"","vm_add":"0","vm":"0.5","date":"2025-11-07","style":"","notes":""},{"id":"co1yujx6","nom":"Sean Steur","poste":"MC","age":"18","nat":"","club":"","vm_add":"0.7","vm":"6","date":"2026-02-01","style":"","notes":""},{"id":"7qzki8fc","nom":"Xander Dierckx","poste":"MC","age":"16","nat":"","club":"","vm_add":"0.4","vm":"2","date":"2026-02-01","style":"","notes":""},{"id":"is6143ck","nom":"Marc Bernal","poste":"MDC","age":"17","nat":"","club":"","vm_add":"1","vm":"30","date":"","style":"4★","notes":""},{"id":"3bssgn40","nom":"Archie Gray","poste":"MDC","age":"18","nat":"","club":"","vm_add":"18","vm":"35","date":"","style":"5★","notes":""},{"id":"406bzsf1","nom":"Dario Essugo","poste":"MDC","age":"19","nat":"","club":"","vm_add":"3","vm":"17","date":"","style":"4★","notes":""},{"id":"o4qtmxcu","nom":"Ayyoub Bouaddi","poste":"MDC","age":"17","nat":"","club":"","vm_add":"10","vm":"50","date":"","style":"5★","notes":""},{"id":"r110tlyb","nom":"Lamine Camara","poste":"MDC","age":"20","nat":"","club":"","vm_add":"10","vm":"35","date":"","style":"4★","notes":""},{"id":"1upxidoi","nom":"Andrey Santos","poste":"MDC","age":"19","nat":"","club":"","vm_add":"15","vm":"45","date":"","style":"5★","notes":""},{"id":"rgfdqb2t","nom":"Máximo Perrone","poste":"MDC","age":"22","nat":"","club":"","vm_add":"9","vm":"30","date":"","style":"3.5★","notes":""},{"id":"gzz9ri4w","nom":"Lennon Miller","poste":"MDC","age":"18","nat":"","club":"","vm_add":"4","vm":"10","date":"","style":"4.5★","notes":""},{"id":"76ce1t0k","nom":"Boris Mamuzah Lum","poste":"MDC","age":"17","nat":"","club":"","vm_add":"0.5","vm":"1","date":"","style":"2★","notes":""},{"id":"srnmps2k","nom":"Jorthy Mokio","poste":"MDC","age":"16","nat":"","club":"","vm_add":"1.5","vm":"8","date":"","style":"4.5★","notes":""},{"id":"053a51du","nom":"Nathan De Cat","poste":"MDC","age":"16","nat":"","club":"","vm_add":"1","vm":"25","date":"","style":"4★","notes":""},{"id":"ktr27k9y","nom":"Abdoulaye Camara","poste":"MDC","age":"16","nat":"","club":"","vm_add":"0","vm":"1.5","date":"2025-03-01","style":"2★","notes":""},{"id":"0dog8psg","nom":"Mathis Amougou","poste":"MDC","age":"18","nat":"","club":"","vm_add":"5","vm":"10","date":"","style":"3.5★","notes":""},{"id":"cx9lmdxr","nom":"Vasilije Novicic","poste":"MDC","age":"17","nat":"","club":"","vm_add":"1","vm":"3.5","date":"","style":"3.5★","notes":""},{"id":"bs13f0lr","nom":"Tyler Morton","poste":"MDC","age":"22","nat":"","club":"","vm_add":"7","vm":"25","date":"","style":"3.5★","notes":""},{"id":"1c0w6y10","nom":"Rafael Luís","poste":"MDC","age":"20","nat":"","club":"","vm_add":"1.2","vm":"4","date":"","style":"3★","notes":""},{"id":"h6eilrq6","nom":"Kennet Eichhorn","poste":"MDC","age":"16","nat":"","club":"","vm_add":"6","vm":"20","date":"2025-11-02","style":"5★","notes":""},{"id":"z7mx7mwn","nom":"Ian Mencía","poste":"MDC","age":"16","nat":"","club":"","vm_add":"0","vm":"0","date":"2025-11-06","style":"","notes":""},{"id":"kr1hkxb1","nom":"Zé Lucas","poste":"MDC","age":"17","nat":"","club":"","vm_add":"8","vm":"8","date":"2026-01-06","style":"4★","notes":""},{"id":"b0xp92pm","nom":"Rafael Quintas","poste":"MDC","age":"18","nat":"","club":"","vm_add":"0","vm":"0","date":"2026-03-18","style":"4★","notes":""},{"id":"sma2ed5o","nom":"Sol Sidibé","poste":"MDC","age":"18","nat":"","club":"","vm_add":"1","vm":"1.2","date":"2026-02-01","style":"","notes":""},{"id":"9xarzbz9","nom":"Adam Aznou","poste":"DG","age":"17","nat":"","club":"","vm_add":"1.5","vm":"7","date":"","style":"5★","notes":""},{"id":"mk0htqgt","nom":"Yaimar Medina","poste":"DG","age":"20","nat":"","club":"","vm_add":"3.5","vm":"3.5","date":"","style":"3★","notes":""},{"id":"rlbhib39","nom":"Álvaro Carreras","poste":"DG","age":"18","nat":"","club":"","vm_add":"18","vm":"60","date":"","style":"3.5★","notes":""},{"id":"mf8u0cyy","nom":"Diego León","poste":"DG","age":"17","nat":"","club":"","vm_add":"4","vm":"4","date":"","style":"","notes":"Mis après rumeur Man U"},{"id":"wgni8xnv","nom":"Jhoan Hernández","poste":"DG","age":"18","nat":"","club":"","vm_add":"0.35","vm":"0.15","date":"","style":"","notes":""},{"id":"86fmj3wb","nom":"Michal Gurgul","poste":"DG","age":"18","nat":"","club":"","vm_add":"3.5","vm":"3","date":"","style":"","notes":""},{"id":"q1v8j1bg","nom":"Valentín Barco","poste":"DG","age":"20","nat":"","club":"","vm_add":"6","vm":"35","date":"","style":"3.5★","notes":""},{"id":"z2y5zeny","nom":"Peyton Miller","poste":"DG","age":"17","nat":"","club":"","vm_add":"0.15","vm":"3","date":"","style":"2★","notes":""},{"id":"egvgsz4j","nom":"Ilya Rozhkov","poste":"DG","age":"19","nat":"","club":"","vm_add":"2","vm":"5","date":"","style":"","notes":""},{"id":"u9ku12vk","nom":"Maxim De Cuyper","poste":"DG","age":"23","nat":"","club":"","vm_add":"12","vm":"22","date":"","style":"3.5★","notes":""},{"id":"gexwuyum","nom":"Myles Lewis-Skelly","poste":"DG","age":"18","nat":"","club":"","vm_add":"10","vm":"40","date":"","style":"4★","notes":""},{"id":"1t523mfq","nom":"Matteo Pérez Vinlöf","poste":"DG","age":"19","nat":"","club":"","vm_add":"1","vm":"2.5","date":"","style":"","notes":""},{"id":"hwwqblol","nom":"Julio Soler","poste":"DG","age":"19","nat":"","club":"","vm_add":"8","vm":"8","date":"","style":"3★","notes":""},{"id":"2c18flox","nom":"Davide Bartesaghi","poste":"DG","age":"19","nat":"","club":"","vm_add":"1.8","vm":"23","date":"","style":"","notes":""},{"id":"tbz33a8b","nom":"Joaquin Seys","poste":"DG","age":"20","nat":"","club":"","vm_add":"8","vm":"17","date":"","style":"","notes":""},{"id":"50cjdpny","nom":"Dayann Methalie","poste":"DG","age":"19","nat":"","club":"","vm_add":"4","vm":"12","date":"2025-10-11","style":"4★","notes":""},{"id":"4jn0rrvl","nom":"Saba Kharebashvili","poste":"DG","age":"17","nat":"","club":"","vm_add":"1.2","vm":"1.2","date":"2025-10-30","style":"3★","notes":""},{"id":"t89jnw74","nom":"José Neto","poste":"DG","age":"17","nat":"","club":"","vm_add":"3","vm":"3","date":"2026-02-15","style":"5★","notes":""},{"id":"nnjqodyk","nom":"Adem Avdic","poste":"DG","age":"18","nat":"","club":"","vm_add":"4","vm":"4","date":"2026-03-26","style":"","notes":""},{"id":"odvaxxlq","nom":"Tiago Santos","poste":"DD","age":"21","nat":"","club":"","vm_add":"8","vm":"15","date":"","style":"4★","notes":""},{"id":"iriudhgk","nom":"Dedic","poste":"DD","age":"21","nat":"","club":"","vm_add":"20","vm":"15","date":"","style":"5★","notes":""},{"id":"bn077z6y","nom":"Ivan Fresneda","poste":"DD","age":"19","nat":"","club":"","vm_add":"7","vm":"12","date":"","style":"3.5★","notes":""},{"id":"0vpitj39","nom":"Conor Bradley","poste":"DD","age":"20","nat":"","club":"","vm_add":"20","vm":"30","date":"","style":"4★","notes":""},{"id":"n5itpo6q","nom":"Martim Fernandes","poste":"DD","age":"18","nat":"","club":"","vm_add":"8","vm":"12","date":"","style":"","notes":""},{"id":"v7fhdae3","nom":"Michael Kayode","poste":"DD","age":"20","nat":"","club":"","vm_add":"18","vm":"27","date":"","style":"4★","notes":""},{"id":"016wjztm","nom":"Devyne Rensch","poste":"DD","age":"21","nat":"","club":"","vm_add":"12","vm":"8.5","date":"","style":"","notes":""},{"id":"rg21s50u","nom":"Wesley","poste":"DD","age":"21","nat":"","club":"","vm_add":"9","vm":"40","date":"","style":"","notes":""},{"id":"n8ly4pf2","nom":"Kosta Nedeljkovic","poste":"DD","age":"19","nat":"","club":"","vm_add":"8.5","vm":"6","date":"","style":"","notes":""},{"id":"6pb55d77","nom":"Pedro Lima","poste":"DD","age":"18","nat":"","club":"","vm_add":"5","vm":"4","date":"","style":"","notes":""},{"id":"6emscmgf","nom":"Josh Acheampong","poste":"DD","age":"18","nat":"","club":"","vm_add":"1","vm":"20","date":"","style":"","notes":""},{"id":"qscao0i5","nom":"Givairo Read","poste":"DD","age":"18","nat":"","club":"","vm_add":"4","vm":"25","date":"","style":"","notes":""},{"id":"2bbun2ix","nom":"Alberto Costa","poste":"DD","age":"21","nat":"","club":"","vm_add":"1","vm":"15","date":"","style":"4★","notes":"Mis après rumeurs Juve"},{"id":"cw519de9","nom":"David Boly","poste":"DD","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"5★","notes":""},{"id":"c4kjfx2o","nom":"Agustín Giay","poste":"DD","age":"21","nat":"","club":"","vm_add":"8","vm":"11","date":"2025-07-31","style":"","notes":""},{"id":"4kuxc8pf","nom":"Daniel Banjaqui","poste":"DD","age":"17","nat":"","club":"","vm_add":"1","vm":"5","date":"2026-01-06","style":"5★","notes":""},{"id":"801tmup9","nom":"Jorrel Hato","poste":"DC","age":"18","nat":"","club":"","vm_add":"20","vm":"35","date":"","style":"5★","notes":""},{"id":"slx748i2","nom":"Joane Gadou","poste":"DC","age":"18","nat":"","club":"","vm_add":"0.5","vm":"12","date":"","style":"2★","notes":""},{"id":"bwtkfrov","nom":"Luka Vuskovic","poste":"DC","age":"17","nat":"","club":"","vm_add":"8","vm":"60","date":"","style":"5★","notes":""},{"id":"avqv60ca","nom":"Abdukodir Khusanov","poste":"DC","age":"20","nat":"","club":"","vm_add":"12","vm":"35","date":"","style":"4★","notes":""},{"id":"qphdup80","nom":"Renato Veiga","poste":"DC","age":"21","nat":"","club":"","vm_add":"10","vm":"25","date":"","style":"3.5★","notes":""},{"id":"faz8tubd","nom":"Deinner Ordóñez","poste":"DC","age":"15","nat":"","club":"","vm_add":"0","vm":"0","date":"","style":"4★","notes":""},{"id":"1smsm29b","nom":"Joel Ordóñez","poste":"DC","age":"19","nat":"","club":"","vm_add":"18","vm":"33","date":"","style":"3★","notes":""},{"id":"thfla96j","nom":"Jan-Carlo Simić","poste":"DC","age":"19","nat":"","club":"","vm_add":"7","vm":"8","date":"","style":"2★","notes":""},{"id":"299kz5qm","nom":"Vitor Reis","poste":"DC","age":"18","nat":"","club":"","vm_add":"14","vm":"30","date":"","style":"5★","notes":"Mis après rumeur City"},{"id":"g5j6r7z5","nom":"Iván Román","poste":"DC","age":"18","nat":"","club":"","vm_add":"1.5","vm":"1.5","date":"","style":"3.5★","notes":""},{"id":"8t3h5nwl","nom":"Tobías Ramírez","poste":"DC","age":"18","nat":"","club":"","vm_add":"4.5","vm":"3","date":"","style":"5★","notes":""},{"id":"rw0kw9og","nom":"Juan Giménez","poste":"DC","age":"18","nat":"","club":"","vm_add":"2.5","vm":"2.5","date":"","style":"4.5★","notes":""},{"id":"vlo9uh3t","nom":"Yasin Özcan","poste":"DC","age":"18","nat":"","club":"","vm_add":"4.5","vm":"7.5","date":"","style":"","notes":""},{"id":"20ygvv5t","nom":"Pietro Comuzzo","poste":"DC","age":"19","nat":"","club":"","vm_add":"15","vm":"23","date":"","style":"","notes":""},{"id":"l3d0xa3u","nom":"Dean Huijsen","poste":"DC","age":"19","nat":"","club":"","vm_add":"18","vm":"65","date":"","style":"4.5★","notes":""},{"id":"jbbbh4z3","nom":"Taras Mykhavko","poste":"DC","age":"19","nat":"","club":"","vm_add":"3","vm":"8","date":"","style":"","notes":""},{"id":"f9yov0nt","nom":"Josue Kongolo","poste":"DC","age":"18","nat":"","club":"","vm_add":"1","vm":"2.5","date":"","style":"","notes":""},{"id":"5ln2oyiw","nom":"Ryan Flamingo","poste":"DC","age":"22","nat":"","club":"","vm_add":"16","vm":"17","date":"","style":"4★","notes":""},{"id":"wrqa7l3d","nom":"Mamadou Sarr","poste":"DC","age":"19","nat":"","club":"","vm_add":"8","vm":"25","date":"","style":"4.5★","notes":""},{"id":"9tq3j7sl","nom":"Andrea Natali","poste":"DC","age":"16","nat":"","club":"","vm_add":"0","vm":"0.4","date":"","style":"","notes":""},{"id":"kf2jk19o","nom":"Giovanni Leoni","poste":"DC","age":"18","nat":"","club":"","vm_add":"4.5","vm":"25","date":"","style":"4.5★","notes":""},{"id":"g2ttib4m","nom":"Nidal Celik","poste":"DC","age":"18","nat":"","club":"","vm_add":"1","vm":"4","date":"2025-02-03","style":"","notes":"Mis après rumeur Lens"},{"id":"d1wt8afg","nom":"Karim Coulibaly","poste":"DC","age":"18","nat":"","club":"","vm_add":"20","vm":"22","date":"2026-02-01","style":"4★","notes":"Minimum 4*"},{"id":"8z2orjna","nom":"Tylel Tati","poste":"DC","age":"17","nat":"","club":"","vm_add":"6","vm":"25","date":"2025-10-12","style":"5★","notes":""},{"id":"lr4wwzvl","nom":"Lucas Hogsberg","poste":"DC","age":"19","nat":"","club":"","vm_add":"3.5","vm":"15","date":"","style":"3★","notes":"Mis après rumeur Strasbourg"},{"id":"0yi6xpqn","nom":"Diego Coppola","poste":"DC","age":"21","nat":"","club":"","vm_add":"10","vm":"10","date":"","style":"","notes":""},{"id":"32zk2frk","nom":"Matte Smets","poste":"DC","age":"21","nat":"","club":"","vm_add":"13","vm":"11","date":"","style":"","notes":""},{"id":"fwa74lcw","nom":"Jérémy Jacquet","poste":"DC","age":"20","nat":"","club":"","vm_add":"10","vm":"55","date":"","style":"5★","notes":""},{"id":"fmhjwzxy","nom":"Jon Martín","poste":"DC","age":"19","nat":"","club":"","vm_add":"8","vm":"10","date":"","style":"","notes":""},{"id":"u7saxira","nom":"Marli Salmon","poste":"DC","age":"16","nat":"","club":"","vm_add":"1","vm":"4","date":"2026-02-01","style":"","notes":""},{"id":"iy66kmiw","nom":"Yusuf Akçiçek","poste":"DC","age":"19","nat":"","club":"","vm_add":"12","vm":"12","date":"","style":"","notes":""},{"id":"rhzu2cyx","nom":"Bung Meng Freimann","poste":"DC","age":"19","nat":"","club":"","vm_add":"2.5","vm":"0","date":"","style":"","notes":""},{"id":"td3cii5z","nom":"Eman Kospo","poste":"DC","age":"18","nat":"","club":"","vm_add":"0","vm":"1.5","date":"","style":"","notes":""},{"id":"2tf1payg","nom":"Noahkai Banks","poste":"DC","age":"18","nat":"","club":"","vm_add":"6","vm":"10","date":"","style":"","notes":""},{"id":"nkmxu4or","nom":"Elie Mbavu","poste":"DC","age":"16","nat":"","club":"","vm_add":"1.5","vm":"1.5","date":"2025-11-02","style":"","notes":""},{"id":"yk7yh79c","nom":"Nikola Simic","poste":"DC","age":"18","nat":"","club":"","vm_add":"1.5","vm":"5","date":"2025-11-02","style":"","notes":""},{"id":"ri7t1b1u","nom":"Mauro Furtado","poste":"DC","age":"17","nat":"","club":"","vm_add":"0","vm":"0","date":"2025-11-06","style":"","notes":""},{"id":"9l0lpy42","nom":"Kyllian Antonio","poste":"DC","age":"18","nat":"","club":"","vm_add":"0.25","vm":"1.5","date":"2026-02-01","style":"","notes":""},{"id":"izm51pn4","nom":"Fabian Merién","poste":"DC","age":"17","nat":"","club":"","vm_add":"0.35","vm":"0.45","date":"2026-02-01","style":"","notes":""},{"id":"08iomiwp","nom":"Ahmed Hadzimujovic","poste":"DC","age":"18","nat":"","club":"","vm_add":"1","vm":"1.5","date":"2026-02-01","style":"","notes":""},{"id":"1eju3k7z","nom":"Noah Markmann","poste":"DC","age":"18","nat":"","club":"","vm_add":"0.7","vm":"6","date":"2026-02-01","style":"","notes":""},{"id":"f8u7i82u","nom":"Savo Radanovic","poste":"GB","age":"16","nat":"","club":"","vm_add":"0.4","vm":"0.4","date":"2026-02-01","style":"","notes":""}];
+let players=[];
+let editId=null;
+
+function load(){try{const d=localStorage.getItem('scouting_v3');players=d?JSON.parse(d):[];}catch(e){players=[];}}
+function save(){try{localStorage.setItem('scouting_v3',JSON.stringify(players));}catch(e){}}
+
+function loadPreloaded(){
+  if(players.length>0&&!confirm('Cela va remplacer les '+players.length+' joueurs actuels par les 245 joueurs pré-chargés. Continuer ?'))return;
+  players=PRELOADED.map(p=>({...p}));
+  save();render();
+  showToast('245 joueurs chargés avec succès !');
+  document.getElementById('btn-preload').style.display='none';
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function fmt(v){
+  if(v==null||v===''||v==='0')return'0M€';
+  const n=parseFloat(v);
+  if(isNaN(n))return'—';
+  if(n===0)return'0M€';
+  if(n<1)return(n*1000).toFixed(0)+'k€';
+  return n%1===0?n+'M€':n.toFixed(1)+'M€';
+}
+function fmtDate(d){
+  if(!d)return'—';
+  const p=d.split('-');
+  if(p.length!==3)return d;
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+function starsNum(p){
+  const s=p.style||'';
+  const m=s.match(/^([\d\.]+)★/);
+  return m?parseFloat(m[1]):null;
+}
+function starsDisplay(p){
+  const n=starsNum(p);
+  if(!n)return'<span style="color:#bbb;font-size:11px">à voir</span>';
+  const full=Math.floor(n);
+  const half=n%1>=0.5;
+  let out='';
+  for(let i=0;i<full;i++)out+='★';
+  if(half)out+='½';
+  return`<span class="stars">${out}</span><span style="font-size:11px;color:#888;margin-left:2px">${n}</span>`;
+}
+
+function updateStats(list){
+  document.getElementById('s-total').textContent=list.length;
+  const vms=list.map(p=>parseFloat(p.vm)).filter(v=>!isNaN(v)&&v>0);
+  document.getElementById('s-vm').textContent=vms.length?(vms.reduce((a,b)=>a+b,0)/vms.length).toFixed(1)+'M€':'—';
+  const ages=list.map(p=>parseInt(p.age)).filter(v=>!isNaN(v));
+  document.getElementById('s-age').textContent=ages.length?(ages.reduce((a,b)=>a+b,0)/ages.length).toFixed(1):'—';
+  const postes=[...new Set(list.map(p=>p.poste).filter(Boolean))];
+  document.getElementById('s-postes').textContent=postes.length||'—';
+  let plusval=0;
+  list.forEach(p=>{
+    const va=parseFloat(p.vm_add)||0;
+    const vc=parseFloat(p.vm)||0;
+    plusval+=(vc-va);
+  });
+  const sign=plusval>=0?'+':'';
+  document.getElementById('s-plusvalue').textContent=sign+plusval.toFixed(1)+'M€';
+}
+
+function render(){
+  load();
+  const search=document.getElementById('f-search').value.toLowerCase();
+  const poste=document.getElementById('f-poste').value;
+  const starsFilter=document.getElementById('f-stars').value;
+  const ageMax=document.getElementById('f-age-max').value;
+  const vmMax=document.getElementById('f-vm-max').value;
+  const sort=document.getElementById('f-sort').value;
+
+  let list=players.filter(p=>{
+    if(search&&!((p.nom||'').toLowerCase().includes(search)||(p.club||'').toLowerCase().includes(search)||(p.nat||'').toLowerCase().includes(search)||(p.notes||'').toLowerCase().includes(search)))return false;
+    if(poste&&p.poste!==poste)return false;
+    if(ageMax&&parseInt(p.age)>parseInt(ageMax))return false;
+    if(vmMax&&parseFloat(p.vm)>parseFloat(vmMax))return false;
+    if(starsFilter!==''){
+      const sn=starsNum(p);
+      if(starsFilter==='0'){if(sn!==null)return false;}
+      else{if(!sn||sn<parseFloat(starsFilter))return false;}
+    }
+    return true;
+  });
+
+  const[key,dir]=sort.split('_');
+  list.sort((a,b)=>{
+    let va,vb;
+    if(key==='stars'){va=starsNum(a)||-1;vb=starsNum(b)||-1;}
+    else if(key==='date'){va=a.date||'0000';vb=b.date||'0000';}
+    else if(key==='age'){va=parseInt(a.age)||0;vb=parseInt(b.age)||0;}
+    else if(key==='vm'){va=parseFloat(a.vm)||0;vb=parseFloat(b.vm)||0;}
+    else if(key==='evol'){va=(parseFloat(a.vm)||0)-(parseFloat(a.vm_add)||0);vb=(parseFloat(b.vm)||0)-(parseFloat(b.vm_add)||0);}
+    else{va=(a.nom||'').toLowerCase();vb=(b.nom||'').toLowerCase();}
+    if(va<vb)return dir==='asc'?-1:1;
+    if(va>vb)return dir==='asc'?1:-1;
+    return 0;
+  });
+
+  updateStats(list);
+  document.getElementById('count-line').textContent=list.length+' joueur'+(list.length>1?'s':'')+(list.length!==players.length?' (filtré sur '+players.length+')':'');
+  const tbody=document.getElementById('tbody');
+  const empty=document.getElementById('empty-state');
+  if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+
+  tbody.innerHTML=list.map((p,i)=>{
+    const bc='badge badge-'+(p.poste||'').toLowerCase();
+    const vmActu=parseFloat(p.vm)||0;
+    const vmAdd=parseFloat(p.vm_add)||0;
+    const diff=vmActu-vmAdd;
+    const evolHtml=diff>0?`<span class="evol-up">▲${diff.toFixed(1)}M</span>`:diff<0?`<span class="evol-dn">▼${Math.abs(diff).toFixed(1)}M</span>`:`<span style="color:#bbb;font-size:11px">—</span>`;
+    const ageN=parseInt(p.age);
+    const ageWarn=ageN>23?'<span class="age-warn"> ⚠</span>':'';
+    const styleClean=(p.style||'').replace(/^[\d\.]+★\s*/,'');
+    return`<tr>
+      <td style="color:#bbb;font-size:11px">${i+1}</td>
+      <td style="font-weight:500;white-space:nowrap">${p.nom||'—'}</td>
+      <td><span class="${bc}">${p.poste||'—'}</span></td>
+      <td>${p.age||'—'}${ageWarn}</td>
+      <td>${starsDisplay(p)}</td>
+      <td style="white-space:nowrap;font-size:12px">${p.club||'—'}</td>
+      <td style="font-size:12px">${p.nat||'—'}</td>
+      <td class="vm-cell">${fmt(p.vm_add)}</td>
+      <td class="vm-cell">${fmt(p.vm)}</td>
+      <td class="vm-cell">${evolHtml}</td>
+      <td class="notes-cell" title="${styleClean.replace(/"/g,'&quot;')}">${styleClean||'—'}</td>
+      <td class="notes-cell" title="${(p.notes||'').replace(/"/g,'&quot;')}">${p.notes||'—'}</td>
+      <td style="white-space:nowrap;color:#888;font-size:12px">${fmtDate(p.date)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn" style="padding:4px 8px;font-size:12px;margin-right:4px" onclick="editPlayer('${p.id}')">✏</button>
+        <button class="btn danger" style="padding:4px 8px;font-size:12px" onclick="deletePlayer('${p.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openModal(id){
+  editId=id||null;
+  const p=id?players.find(x=>x.id===id):null;
+  document.getElementById('modal-title').textContent=p?'Modifier — '+p.nom:'Nouveau joueur';
+  document.getElementById('f-nom').value=p?.nom||'';
+  document.getElementById('f-fposte').value=p?.poste||'';
+  document.getElementById('f-fage').value=p?.age||'';
+  const sn=p?starsNum(p):null;
+  document.getElementById('f-fstars').value=sn||'';
+  document.getElementById('f-fnat').value=p?.nat||'';
+  document.getElementById('f-fclub').value=p?.club||'';
+  document.getElementById('f-fvmadd').value=p?.vm_add||'';
+  document.getElementById('f-fvm').value=p?.vm||'';
+  document.getElementById('f-fdate').value=p?.date||new Date().toISOString().split('T')[0];
+  const styleClean=(p?.style||'').replace(/^[\d\.]+★\s*/,'');
+  document.getElementById('f-fstyle').value=styleClean;
+  document.getElementById('f-fnotes').value=p?.notes||'';
+  document.getElementById('age-warn').style.display='none';
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none';}
+function bgClick(e){if(e.target.id==='modal')closeModal();}
+function checkAge(){
+  const v=parseInt(document.getElementById('f-fage').value);
+  document.getElementById('age-warn').style.display=(v&&v>23)?'block':'none';
+}
+function editPlayer(id){load();openModal(id);}
+function deletePlayer(id){
+  if(!confirm('Supprimer ce joueur ?'))return;
+  load();players=players.filter(p=>p.id!==id);save();render();showToast('Joueur supprimé');
+}
+function savePlayer(){
+  const nom=document.getElementById('f-nom').value.trim();
+  const poste=document.getElementById('f-fposte').value;
+  if(!nom||!poste){alert('Le nom et le poste sont obligatoires.');return;}
+  load();
+  const starsVal=document.getElementById('f-fstars').value;
+  const styleText=document.getElementById('f-fstyle').value.trim();
+  const styleField=starsVal?(starsVal+'★'+(styleText?' '+styleText:'')):styleText;
+  const obj={
+    id:editId||Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    nom,poste,
+    age:document.getElementById('f-fage').value,
+    nat:document.getElementById('f-fnat').value.trim(),
+    club:document.getElementById('f-fclub').value.trim(),
+    vm_add:document.getElementById('f-fvmadd').value,
+    vm:document.getElementById('f-fvm').value,
+    date:document.getElementById('f-fdate').value,
+    style:styleField,
+    notes:document.getElementById('f-fnotes').value.trim()
+  };
+  if(editId){const i=players.findIndex(p=>p.id===editId);if(i>=0)players[i]=obj;}
+  else players.push(obj);
+  save();closeModal();render();showToast(editId?'Joueur modifié':'Joueur ajouté !');
+}
+
+document.getElementById('date-display').textContent='Mis à jour le '+new Date().toLocaleDateString('fr-FR');
+load();
+if(players.length===0){
+  document.getElementById('empty-state').style.display='block';
+  document.getElementById('empty-state').textContent='Clique sur "Charger ma liste" pour importer tes 245 joueurs !';
+}
+render();
+</script>
+</body>
+</html>
